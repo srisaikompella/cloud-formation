@@ -1,0 +1,122 @@
+Paramters allows us to define inputs for our template.
+Example::
+----------
+Parameters:
+  Environment: # custom name
+    Type: String # mandatory
+    Description: "App Environment"
+    AllowedValues: # dropdown menu for the user
+      - qa
+      - prod
+      - dev
+  BucketName: # logical name
+    Type: String
+    MinLength: 3 # Min length of the name should be 3
+    MaxLength: 10 # Max length of the name should be 10
+    AllowedPattern: "[A-za-z]+" # User has to enter only alphabets (capital/small)
+    
+  TestSubnet: # logical name
+    Description: "Test"
+    Type: String
+    Default: "10.150.35.0/24"
+    ConstraintDescription: 'IPv4 Block in the CIDR notation is required, e.g. 10.0.0.0/22'
+    AllowedPattern: "[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}/[0-9]{1,2}"
+                    => 192       .  168.        90.          10.  / 24
+=>  [0-9]: Matches any digit from 0 to 9.
+=>  {1,3}: Specifies that the preceding expression (in this case, [0-9]) should occur between 1 and 3 times.
+
+
+Mapping within template are the key value pair. If you want to pick certain value based on certain condition, in that scenario we can use mappings.
+
+Ex: let's say we want to select instance type based on the environment, then we can use mappings.
+Parameters:
+  Environment: # custom name
+    Type: String # mandatory
+    Description: "App Environment"
+    AllowedValues: # dropdown menu for the user
+      - qa
+      - prod
+      - dev
+
+Mappings:
+  KashiMap: # logical name
+    dev: 
+      instanceType: "t2.large"
+      name: "dev"
+    prod: 
+      instanceType: "t3.micro"
+      name: "prod"
+
+Usage: 
+  Resources: 
+    Instance:
+      Type: AWS::EC2::Instance
+      Properties:
+        InstanceType: !FindInMap [KashiMap, !Ref  Environment, instanceType]
+        ImageId: <ami-id>
+        Tags:
+        - Key: "name"
+          Value: !FindInMap [KashiMap, !Ref Environment, name]
+# environment value can be dev, prod, qa and this value will be inputted by user. And we are checking for the input value in map. 
+# if user select dev, the instance type would be t2.large. The same applies for name variable in map.
+
+Conditions allows to deploy or skip the resources based on user input..
+Parameters:
+  CreateSubnets:
+    Description: Whether to create the AZ2 subnets
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+
+Conditions:
+  ShouldCreateSubnets: !Equals [ !Ref CreateSubnets, "true" ]
+
+  Test:
+    Condition: ShouldCreateSubnets # if it is set to true then subnet is created.
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub 'RT-${VPCName}-Kashi' 
+
+Select: if you want to pick a value from a list of values then we can use this.
+
+Parameters:
+  Environment: # custom name
+    Type: String # mandatory
+    Description: "App Environment"
+    AllowedValues: # dropdown menu for the user
+      - qa
+      - prod
+      - dev
+Conditions:
+  CreateInstances: !Equals [ !Ref Environment, qa]
+
+
+Usage: 
+
+  Resources: 
+    Instance:
+      Type: AWS::EC2::Instance
+      Properties:
+        InstanceType: !If [ CreateInstances, !Select [0, [t2.micro, m1.large] ], !Select [1, [t2.micro, m1.large] ] ]
+        ImageId: <ami-id>
+
+
+If the user selects qa then CreateInstances condition is true and 0 element from list is selected-> t2.micro. if CreateInstances condition is false then 1 element from list is selected -> m1.large.
+
+instead of mappings we can we use if if we have two cases only. for multiple conditionals we can use mappings.
+
+Join: it is used to join the list of values using the delimiter provided. Incase if we donot provide a delimiter then it concatenates the elements without a delimiter.
+
+ex: 
+!Join [ "-", ["a", "b", "c"]] # here "-" is delimiter. [a, b, c] is the list
+ans: a-b-c
+
+!Join ["", ["a", "b", "c"] ] ans: abc
+
+
+
+
+
